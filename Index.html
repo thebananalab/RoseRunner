@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rose Runner 🐱</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000011;display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:20px;font-family:'Press Start 2P',monospace}
+#wrap{width:680px;max-width:100%;border:3px solid #111;overflow:hidden}
+#chrome{background:#F4D242;border-bottom:3px solid #111;padding:7px 12px;display:flex;align-items:center;gap:10px}
+.dots{display:flex;gap:5px}
+.dot{width:11px;height:11px;border-radius:50%;border:2px solid #0003}
+.dot.r{background:#ff5f5f}.dot.y{background:#ffbd2e}.dot.g{background:#28ca41}
+#url-bar{flex:1;background:#fff;border:2px solid #111;font-size:8px;padding:3px 8px;color:#111;font-family:'Press Start 2P',monospace}
+#chrome-ctrl{font-size:10px;font-weight:900;color:#111;letter-spacing:2px}
+#game-area{position:relative;overflow:hidden}
+canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.82)}
+.panel{background:#000;border:3px solid #F4D242;width:300px;overflow:hidden}
+.pbar{background:#F4D242;padding:6px 10px;font-size:7px;color:#111;display:flex;justify-content:space-between}
+.pbody{padding:18px;display:flex;flex-direction:column;gap:10px}
+.pbody h1{font-size:15px;color:#F4D242;line-height:1.6}
+.pbody h1 em{color:#f060c8;font-style:normal}
+.pbody p{font-size:7px;color:#ccc;line-height:2.2}
+.pbtn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.btn{background:#F4D242;color:#111;border:2px solid #fff;padding:8px 14px;font-family:'Press Start 2P',monospace;font-size:7px;cursor:pointer}
+.btn:hover{background:#ffe000}
+.btn-o{background:transparent;color:#F4D242;border:2px solid #F4D242;padding:8px 14px;font-family:'Press Start 2P',monospace;font-size:7px;cursor:pointer}
+.btn-o:hover{background:#F4D24222}
+#sbar{background:#111;border-top:3px solid #F4D242;padding:5px 12px;font-size:7px;color:#F4D242;display:flex;justify-content:space-between}
+#bio{display:none;border-top:3px solid #F4D242}
+.bio-bar{background:#F4D242;border-bottom:3px solid #111;padding:7px 12px;font-size:7px;color:#111;display:flex;justify-content:space-between}
+.bio-body{padding:28px 32px;background:#fff}
+.bio-body h2{font-size:20px;color:#111;letter-spacing:-1px;line-height:1.4;margin-bottom:8px}
+.bio-body h2 span{color:#f060c8}
+.bio-lbl{font-size:7px;color:#aaa;letter-spacing:1px;border-bottom:2px solid #eee;padding-bottom:10px;margin-bottom:20px}
+.bio-body p{font-family:'Press Start 2P',monospace;font-size:7px;line-height:2.4;margin-bottom:16px;color:#111}
+.bio-body strong{background:#F4D242;padding:0 2px}
+.unlocks{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.ul-item{font-size:6px;padding:4px 7px;border:2px solid #ddd;color:#aaa;letter-spacing:1px}
+.ul-item.got{border-color:#F4D242;color:#111;background:#F4D242}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="chrome">
+    <div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+    <div id="url-bar">rose-runner.studio/cat</div>
+    <div id="chrome-ctrl">− □ ×</div>
+  </div>
+  <div id="game-area">
+    <canvas id="gc" width="680" height="200"></canvas>
+    <div class="ov" id="ov-start">
+      <div class="panel">
+        <div class="pbar"><span>NUEVA PESTAÑA</span><span>× − □</span></div>
+        <div class="pbody">
+          <h1>ROSE<br><em>RUNNER</em></h1>
+          <p>Esquiva las puertas y recoge los items para descubrir la historia de Rose.</p>
+          <p style="color:#F4D242">[ ESPACIO ] o toca para saltar</p>
+          <div class="pbtn-row"><button class="btn" id="sb">▶ PLAY</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="ov" id="ov-end" style="display:none">
+      <div class="panel">
+        <div class="pbar"><span>GAME OVER</span><span>× − □</span></div>
+        <div class="pbody">
+          <h1 id="et" style="font-size:12px;color:#F4D242">GOOD RUN!</h1>
+          <p>ITEMS: <span id="ec">0</span> / <span id="etotal">7</span></p>
+          <div class="pbtn-row">
+            <button class="btn" id="rb">▶ RETRY</button>
+            <button class="btn-o" id="bb">VER BIO →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="sbar">
+    <span id="sb-l">🐱 ROSE RUNNER — ESPACIO PARA SALTAR</span>
+    <span id="sb-r">SCORE: 0</span>
+  </div>
+  <div id="bio">
+    <div class="bio-bar"><span>BIO — LAURA ROSA DÍAZ CAÑAS</span><span>− □ ×</span></div>
+    <div class="bio-body">
+      <h2>ROSE <span>DAYS</span></h2>
+      <p class="bio-lbl">MÁSTER PRODUCT MANAGEMENT: AI & DATA-DRIVEN</p>
+      <p>Me llamo Laura Rosa Díaz Cañas, aunque todo el mundo me llama Rose. Soy de Medellín, Colombia, y llevo siete años viviendo en Barcelona, una ciudad donde me siento completamente yo.</p>
+      <p>Soy directora creativa y consultora de marca con más de diez años de experiencia. Mi carrera se ha movido siempre en la intersección entre creatividad y estrategia: identidades de marca, sistemas de contenido, equipos creativos y estrategias digitales.</p>
+      <p>Este último año fundé <strong>Banana Lab</strong>, un estudio de herramientas con IA para equipos creativos. Construirlo me hizo ver que necesito pensar en producto y tomar decisiones con mayor rigor metodológico. Por eso me apunté al máster.</p>
+      <p>Mi objetivo: consolidar Banana Lab y llegar a roles como Creative AI Lead o Head of Brand & Product. Este máster conecta lo que he hecho con lo que quiero construir. ♡</p>
+      <p class="bio-lbl" style="margin-top:20px;margin-bottom:8px">ITEMS DESBLOQUEADOS</p>
+      <div class="unlocks" id="ul"></div>
+    </div>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('gc');
+const cx=cv.getContext('2d');
+cx.imageSmoothingEnabled=false;
+const W=680,H=200,P=3,GY=H-36;
+const _=0,K=1,O=2,Y=3,W_=4,G=5,Pk=6,E=7,N=8,S=9;
+const PAL={0:null,1:'#1a1a1a',2:'#f0a030',3:'#f8c060',4:'#ffffff',5:'#40cc60',6:'#ff8899',7:'#c06820',8:'#c07020',9:'#d08828'};
+const FRAMES=[[
+[_,_,_,K,K,_,_,_,_,_,K,K,_,_,_,_],
+[_,_,K,E,Pk,K,_,_,_,K,E,Pk,K,_,_,_],
+[_,_,K,O,O,K,K,K,K,K,O,O,K,_,_,_],
+[_,K,O,Y,O,O,O,O,O,O,O,Y,O,K,_,_],
+[_,K,O,O,W_,W_,O,O,W_,W_,O,O,K,_,_,_],
+[_,K,O,O,W_,G,K,O,W_,G,K,O,K,_,_,_],
+[_,K,O,O,W_,K,W_,O,W_,K,W_,O,K,_,_,_],
+[_,K,O,O,O,Pk,O,O,O,O,O,O,K,_,_,_],
+[_,_,K,O,O,O,O,O,O,O,O,K,_,_,_,_],
+[_,_,K,N,O,O,O,O,O,O,N,K,_,_,_,_],
+[_,_,K,O,O,O,O,O,O,O,O,K,_,_,_,_],
+[_,_,K,O,O,K,_,_,K,O,O,K,_,_,_,_],
+[_,K,O,O,K,_,_,_,_,K,O,O,K,_,_,_],
+[_,K,O,K,_,_,_,_,_,_,K,O,K,_,_,_],
+[_,K,S,K,_,_,_,_,_,_,_,K,S,K,_,_],
+[_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_],
+],[
+[_,_,_,K,K,_,_,_,_,_,K,K,_,_,_,_],
+[_,_,K,E,Pk,K,_,_,_,K,E,Pk,K,_,_,_],
+[_,_,K,O,O,K,K,K,K,K,O,O,K,_,_,_],
+[_,K,O,Y,O,O,O,O,O,O,O,Y,O,K,_,_],
+[_,K,O,O,W_,W_,O,O,W_,W_,O,O,K,_,_,_],
+[_,K,O,O,W_,G,K,O,W_,G,K,O,K,_,_,_],
+[_,K,O,O,W_,K,W_,O,W_,K,W_,O,K,_,_,_],
+[_,K,O,O,O,Pk,O,O,O,O,O,O,K,_,_,_],
+[_,_,K,O,O,O,O,O,O,O,O,K,_,_,_,_],
+[_,_,K,N,O,O,O,O,O,O,N,K,_,_,_,_],
+[_,_,K,O,O,O,O,O,O,O,O,K,_,_,_,_],
+[_,K,O,O,K,_,_,_,K,O,O,K,_,_,_,_],
+[K,O,O,K,_,_,_,_,_,K,O,O,K,_,_,_],
+[K,O,K,_,_,_,_,_,_,_,K,O,K,_,_,_],
+[K,S,K,_,_,_,_,_,_,_,_,K,S,K,_,_],
+[_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_],
+]];
+const JUMP_F=[
+[_,_,_,K,K,_,_,_,_,_,K,K,_,_,_,_],
+[_,_,K,E,Pk,K,_,_,_,K,E,Pk,K,_,_,_],
+[_,_,K,O,O,K,K,K,K,K,O,O,K,_,_,_],
+[_,K,O,Y,O,O,O,O,O,O,O,Y,O,K,_,_],
+[_,K,O,O,W_,W_,O,O,W_,W_,O,O,K,_,_,_],
+[_,K,O,O,W_,G,K,O,W_,G,K,O,K,_,_,_],
+[_,K,O,O,W_,K,W_,O,W_,K,W_,O,K,_,_,_],
+[_,K,O,O,O,Pk,O,O,O,O,O,O,K,_,_,_],
+[_,_,K,O,O,O,O,O,O,O,O,K,_,_,_,_],
+[_,_,K,N,O,O,O,O,O,O,N,K,_,_,_,_],
+[_,K,O,O,O,K,_,_,K,O,O,O,K,_,_,_],
+[K,O,O,K,_,_,_,_,_,K,O,O,K,_,_,_],
+[K,S,K,_,_,_,_,_,_,_,K,S,K,_,_,_],
+[_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_],
+[_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_],
+[_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_],
+];
+const SPR=16,CPX=SPR*P;
+function drawCat(ox,oy,frame,jumping){
+  const grid=jumping?JUMP_F:FRAMES[frame%2];
+  for(let r=0;r<SPR;r++){const row=grid[r];if(!row)continue;for(let c=0;c<SPR;c++){const v=row[c];if(!v)continue;cx.fillStyle=PAL[v];cx.fillRect(ox+c*P,oy+r*P,P,P);}}
+}
+const DCOLS=[{f:'#d63060',p:'#aa2050',t:'#800030'},{f:'#2255cc',p:'#1144aa',t:'#003388'},{f:'#cc6622',p:'#aa5511',t:'#883300'},{f:'#338844',p:'#226633',t:'#114422'}];
+const DW=11*P,DH=20*P;
+function drawDoor(ox,oy,ci){
+  const s=DCOLS[ci%4];
+  cx.fillStyle=s.t;cx.fillRect(ox,oy,DW,DH);
+  cx.fillStyle=s.f;cx.fillRect(ox+P,oy+P,DW-2*P,DH-P);
+  cx.fillStyle=s.p;cx.fillRect(ox+2*P,oy+2*P,DW-4*P,7*P);cx.fillRect(ox+2*P,oy+11*P,DW-4*P,7*P);
+  cx.fillStyle='rgba(255,255,255,0.18)';cx.fillRect(ox+2*P,oy+2*P,2*P,2*P);cx.fillRect(ox+2*P,oy+11*P,2*P,2*P);
+  cx.fillStyle='#F4D242';cx.fillRect(ox+DW-3*P,oy+11*P,2*P,2*P);
+  cx.fillStyle='#111';cx.fillRect(ox+DW-3*P+1,oy+11*P+1,P,P);
+}
+function drawHeart(ox,oy){cx.fillStyle='#ff4477';[[1,0,2],[4,0,2],[0,1,7],[0,2,7],[1,3,5],[2,4,3],[3,5,1]].forEach(([x,y,w])=>cx.fillRect(ox+x*P,oy+y*P,w*P,P));cx.fillStyle='#ff99bb';[[1,1],[2,1],[1,2]].forEach(([x,y])=>cx.fillRect(ox+x*P,oy+y*P,P,P));cx.fillStyle='#fff';cx.fillRect(ox+2*P,oy+P,P,P);}
+function drawStar(ox,oy){cx.fillStyle='#F4D242';cx.fillRect(ox+3*P,oy,2*P,8*P);cx.fillRect(ox,oy+3*P,8*P,2*P);[[1,1],[6,1],[1,6],[6,6]].forEach(([x,y])=>cx.fillRect(ox+x*P,oy+y*P,P,P));}
+function drawBanana(ox,oy){cx.fillStyle='#226600';cx.fillRect(ox+3*P,oy,2*P,2*P);cx.fillStyle='#F4D242';[[1,1,6],[0,2,7],[0,3,7],[1,4,6],[2,5,5],[3,6,4],[4,7,3]].forEach(([x,y,w])=>cx.fillRect(ox+x*P,oy+y*P,w*P,P));cx.fillStyle='#fff';cx.fillRect(ox+P,oy+2*P,2*P,P);cx.fillStyle='#cc8800';cx.fillRect(ox+5*P,oy+7*P,2*P,2*P);}
+function drawFlag(ox,oy){cx.fillStyle='#111';cx.fillRect(ox,oy,P,10*P);cx.fillStyle='#F4D242';cx.fillRect(ox+P,oy,8*P,3*P);cx.fillStyle='#3366cc';cx.fillRect(ox+P,oy+3*P,8*P,2*P);cx.fillStyle='#cc2233';cx.fillRect(ox+P,oy+5*P,8*P,3*P);}
+function drawDiploma(ox,oy){cx.fillStyle='#e8d4a0';cx.fillRect(ox,oy,10*P,10*P);cx.fillStyle='#f5e6c0';cx.fillRect(ox+P,oy,8*P,9*P);cx.fillStyle='#cc9900';[[2,2,6],[2,4,4],[2,6,5]].forEach(([x,y,w])=>cx.fillRect(ox+x*P,oy+y*P,w*P,P));cx.fillStyle='#cc2233';cx.fillRect(ox+4*P,oy+8*P,2*P,3*P);cx.fillStyle='#F4D242';cx.fillRect(ox+3*P,oy+9*P,4*P,2*P);cx.fillStyle='#d4c090';cx.fillRect(ox,oy,P,10*P);cx.fillRect(ox+9*P,oy,P,10*P);}
+function drawBook(ox,oy){cx.fillStyle='#5511aa';cx.fillRect(ox,oy+2*P,8*P,8*P);cx.fillStyle='#9944ee';cx.fillRect(ox+P,oy+2*P,7*P,7*P);cx.fillStyle='#7733cc';cx.fillRect(ox+P,oy+P,8*P,8*P);cx.fillStyle='#fff';cx.fillRect(ox,oy+2*P,2*P,7*P);cx.fillRect(ox+P,oy+8*P,7*P,2*P);cx.fillStyle='#33ddcc';cx.fillRect(ox+4*P,oy+3*P,2*P,P);cx.fillRect(ox+5*P,oy+4*P,P,P);cx.fillRect(ox+4*P,oy+5*P,P,P);cx.fillRect(ox+4*P,oy+7*P,P,P);}
+function drawCamera(ox,oy){cx.fillStyle='#333344';cx.fillRect(ox,oy+P,11*P,7*P);cx.fillStyle='#111';cx.fillRect(ox+3*P,oy+2*P,5*P,5*P);cx.fillStyle='#2244cc';cx.fillRect(ox+4*P,oy+3*P,3*P,3*P);cx.fillStyle='#fff';cx.fillRect(ox+4*P,oy+3*P,P,P);cx.fillStyle='#ffee44';cx.fillRect(ox+9*P,oy+2*P,2*P,2*P);cx.fillStyle='#ff4444';cx.fillRect(ox+5*P,oy,P,P);cx.fillStyle='#888';cx.fillRect(ox+P,oy,2*P,P);cx.fillRect(ox+8*P,oy,2*P,P);}
+const ITEMS=[{label:'Banana Lab fundada',draw:drawBanana},{label:'Pasión creativa',draw:drawHeart},{label:'ESADE · Brand Management',draw:drawDiploma},{label:'Medellín → Barcelona',draw:drawFlag},{label:'10 años experiencia',draw:drawStar},{label:'AI y nuevos caminos',draw:drawBook},{label:'Dentsu Creative',draw:drawCamera}];
+const STARS=Array.from({length:30},()=>({x:Math.random()*W,y:Math.random()*(GY-10),t:Math.random()*Math.PI*2,cross:Math.random()<0.3}));
+function drawBg(){
+  cx.fillStyle='#000011';cx.fillRect(0,0,W,H);
+  STARS.forEach(s=>{const b=(Math.sin(fr*0.05+s.t)+1)/2;cx.globalAlpha=0.2+b*0.8;cx.fillStyle='#fff';if(s.cross){cx.fillRect(s.x-P,s.y,P,3*P);cx.fillRect(s.x,s.y-P,3*P,P);cx.fillRect(s.x,s.y+P,P,3*P);cx.fillRect(s.x+P,s.y,P,3*P);}else{cx.fillRect(s.x,s.y,2,2);}});
+  cx.globalAlpha=1;
+  cx.fillStyle='#1a0a2e';cx.fillRect(0,GY,W,H-GY);
+  cx.fillStyle='#2d1854';cx.fillRect(0,GY,W,3);
+  for(let x=0;x<W;x+=8){cx.fillStyle=((x/8+Math.floor(fr/5))%2===0)?'#F4D242':'#111';cx.fillRect(x,GY+3,8,8);}
+}
+function drawHUD(){cx.fillStyle='rgba(0,0,0,0.75)';cx.fillRect(0,0,W,18);cx.fillStyle='#F4D242';cx.font='7px "Press Start 2P",monospace';cx.textAlign='left';cx.fillText('★ '+collected.length+'/'+ITEMS.length,8,13);cx.textAlign='right';cx.fillText('SCORE: '+score,W-8,13);}
+let cat,obs,items,fr=0,score=0,spd=3.5,stimer=70,collected=[],state='idle',aid;
+function init(){cat={x:60,y:GY-CPX,vy:0,jump:false};obs=[];items=[];fr=0;score=0;collected=[];spd=3.5;stimer=70;document.getElementById('sb-r').textContent='SCORE: 0';document.getElementById('sb-l').textContent='🐱 ROSE RUNNER — ESPACIO PARA SALTAR';}
+function loop(){
+  if(state!=='play')return;
+  cx.clearRect(0,0,W,H);drawBg();
+  fr++;score++;if(fr%300===0)spd=Math.min(spd+0.18,8.5);
+  document.getElementById('sb-r').textContent='SCORE: '+score;
+  cat.vy+=0.62;cat.y+=cat.vy;
+  const gnd=GY-CPX;if(cat.y>=gnd){cat.y=gnd;cat.vy=0;cat.jump=false;}
+  stimer--;
+  if(stimer<=0){
+    if(Math.random()<0.44&&collected.length<ITEMS.length){const avail=ITEMS.filter(i=>!collected.find(c=>c.label===i.label));if(avail.length){const it=avail[Math.floor(Math.random()*avail.length)];items.push({x:W+20,y:GY-12*P,...it,t:fr});}}
+    else{obs.push({x:W+20,y:GY-DH,scheme:Math.floor(Math.random()*4)});}
+    stimer=55+Math.floor(Math.random()*55);
+  }
+  obs.forEach(o=>o.x-=spd);items.forEach(i=>i.x-=spd);
+  obs=obs.filter(o=>o.x>-60);items=items.filter(i=>i.x>-50);
+  const cl=cat.x+3*P,cr=cat.x+CPX-3*P,ct=cat.y+2*P,cb=cat.y+CPX-P;
+  for(let o of obs){if(cr>o.x+4&&cl<o.x+DW-4&&cb>o.y+6&&ct<o.y+DH-2){endGame();return;}}
+  for(let i=items.length-1;i>=0;i--){const it=items[i];if(cr>it.x+2&&cl<it.x+10*P-2&&cb>it.y+2&&ct<it.y+10*P-2){collected.push(it);items.splice(i,1);document.getElementById('sb-l').textContent='★ '+collected.length+'/'+ITEMS.length+' ITEMS';}}
+  obs.forEach(o=>drawDoor(o.x,o.y,o.scheme));
+  items.forEach(it=>{const b=0.55+Math.sin(fr*0.12+it.t)*0.45;cx.globalAlpha=b;cx.fillStyle='rgba(244,210,66,0.22)';cx.fillRect(it.x-4,it.y-4,12*P+8,12*P+8);cx.globalAlpha=1;it.draw(it.x,it.y);});
+  drawCat(cat.x,cat.y,Math.floor(fr/7)%2,cat.jump);
+  drawHUD();aid=requestAnimationFrame(loop);
+}
+function jump(){if(!cat.jump&&state==='play'){cat.vy=-13;cat.jump=true;}}
+function endGame(){cancelAnimationFrame(aid);state='end';const n=collected.length;document.getElementById('et').textContent=n>=5?'¡CRACK! ★':n>=3?'GOOD RUN! ♡':'GAME OVER...';document.getElementById('ec').textContent=n;document.getElementById('ov-end').style.display='flex';updateUL();}
+function updateUL(){document.getElementById('ul').innerHTML=ITEMS.map(it=>{const g=collected.find(c=>c.label===it.label);return`<span class="ul-item${g?' got':''}">${it.label}</span>`;}).join('');}
+document.getElementById('sb').onclick=()=>{document.getElementById('ov-start').style.display='none';state='play';init();loop();};
+document.getElementById('rb').onclick=()=>{document.getElementById('ov-end').style.display='none';document.getElementById('bio').style.display='none';state='play';init();loop();};
+document.getElementById('bb').onclick=()=>{updateUL();document.getElementById('bio').style.display='block';document.getElementById('ov-end').style.display='none';document.getElementById('bio').scrollIntoView({behavior:'smooth'});};
+document.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();jump();}});
+cv.addEventListener('click',jump);
+cv.addEventListener('touchstart',e=>{e.preventDefault();jump();});
+</script>
+</body>
+</html>
