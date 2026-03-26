@@ -41,6 +41,53 @@ canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-
 .unlocks{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .ul-item{font-size:6px;padding:4px 7px;border:2px solid #ddd;color:#aaa;letter-spacing:1px}
 .ul-item.got{border-color:#F4D242;color:#111;background:#F4D242}
+
+/* ── Rive icon overlay layer ── */
+#rive-layer{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  overflow:hidden;
+}
+.rive-icon{
+  position:absolute;
+  width:48px;
+  height:48px;
+  pointer-events:none;
+  /* glow pulse */
+  filter:drop-shadow(0 0 6px #F4D24299);
+  animation:icon-pulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes icon-pulse{
+  from{filter:drop-shadow(0 0 4px #F4D24266);}
+  to{filter:drop-shadow(0 0 12px #F4D242cc) drop-shadow(0 0 20px #f060c844);}
+}
+
+/* collect burst */
+.collect-burst{
+  position:absolute;
+  width:60px;height:60px;
+  pointer-events:none;
+  border-radius:50%;
+  background:radial-gradient(circle,#F4D24299 0%,transparent 70%);
+  animation:burst .4s ease-out forwards;
+}
+@keyframes burst{
+  from{transform:scale(0.5);opacity:1;}
+  to{transform:scale(2.5);opacity:0;}
+}
+
+/* ── Rive loading notice ── */
+#rive-notice{
+  position:absolute;
+  bottom:8px;left:50%;transform:translateX(-50%);
+  background:#000a;
+  border:1px solid #F4D24255;
+  padding:3px 8px;
+  font-size:6px;color:#F4D24299;
+  white-space:nowrap;
+  pointer-events:none;
+}
 </style>
 </head>
 <body>
@@ -52,6 +99,11 @@ canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-
   </div>
   <div id="game-area">
     <canvas id="gc" width="680" height="200"></canvas>
+
+    <!-- Rive icons rendered here, on top of the canvas -->
+    <div id="rive-layer"></div>
+    <div id="rive-notice">🎮 Rive icons: drop your .riv file or set RIV_URL below</div>
+
     <div class="ov" id="ov-start">
       <div class="panel">
         <div class="pbar"><span>NUEVA PESTAÑA</span><span>× − □</span></div>
@@ -95,7 +147,144 @@ canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-
     </div>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════
+     RIVE INTEGRATION
+     ══════════════════════════════════════════════
+     HOW TO USE YOUR .riv FILE:
+     1. Host your .riv file somewhere (GitHub Pages, Netlify, your own server, etc.)
+     2. Set RIV_URL below to the public URL of your file
+     3. Set RIV_ARTBOARDS to the artboard names inside your .riv for each item
+        (open your file in https://rive.app/preview to see artboard names)
+     ══════════════════════════════════════════════ -->
 <script>
+// ── CONFIG: update these two lines ───────────────────────────────
+const RIV_URL = '';          // e.g. 'https://yoursite.com/icons.riv'
+const RIV_ARTBOARDS = [      // artboard name per item (7 total), or '' to use default
+  '',  // Banana Lab
+  '',  // Pasión creativa
+  '',  // ESADE diploma
+  '',  // Medellín → Barcelona
+  '',  // 10 años experiencia
+  '',  // AI y nuevos caminos
+  '',  // Dentsu Creative
+];
+// ─────────────────────────────────────────────────────────────────
+</script>
+
+<script src="https://unpkg.com/@rive-app/canvas@2.23.0/rive.js"></script>
+<script>
+// ═══════════════════════════════════════════
+// RIVE MANAGER
+// Manages a pool of Rive canvases for items.
+// Falls back to pixel art if no .riv URL set.
+// ═══════════════════════════════════════════
+const riveLayer = document.getElementById('rive-layer');
+const riveNotice = document.getElementById('rive-notice');
+const riveAvailable = typeof Rive !== 'undefined' && RIV_URL !== '';
+
+// Update notice
+if (!RIV_URL) {
+  riveNotice.textContent = '⚠️ Set RIV_URL in the script to load your .riv icons';
+} else if (!riveAvailable) {
+  riveNotice.textContent = '⚠️ Rive.js failed to load — using pixel art fallback';
+} else {
+  riveNotice.style.display = 'none';
+}
+
+// Pool of Rive instances per item slot
+const rivePool = {}; // key: itemLabel → { el, riveInstance, canvas }
+
+function getRiveIcon(label, artboard) {
+  if (!riveAvailable) return null;
+  if (rivePool[label]) return rivePool[label];
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'rive-icon';
+  wrapper.style.display = 'none';
+
+  const cvs = document.createElement('canvas');
+  cvs.width = 48;
+  cvs.height = 48;
+  wrapper.appendChild(cvs);
+  riveLayer.appendChild(wrapper);
+
+  let ri = null;
+  try {
+    ri = new Rive({
+      src: RIV_URL,
+      canvas: cvs,
+      artboard: artboard || undefined,
+      autoplay: true,
+      onLoad: () => {
+        ri.resizeDrawingSurfaceToCanvas();
+      },
+      onLoadError: (e) => {
+        console.warn('Rive load error:', e);
+        wrapper.style.display = 'none';
+      }
+    });
+  } catch(e) {
+    console.warn('Rive init error:', e);
+  }
+
+  const entry = { el: wrapper, riveInstance: ri, canvas: cvs };
+  rivePool[label] = entry;
+  return entry;
+}
+
+function showRiveIcon(label, artboard, x, y) {
+  if (!riveAvailable) return false;
+  const entry = getRiveIcon(label, artboard);
+  if (!entry) return false;
+
+  // Convert game canvas coords to overlay coords
+  const gameCanvas = document.getElementById('gc');
+  const rect = gameCanvas.getBoundingClientRect();
+  const scaleX = rect.width / 680;
+  const scaleY = rect.height / 200;
+
+  const px = x * scaleX;
+  const py = y * scaleY;
+
+  entry.el.style.left = px + 'px';
+  entry.el.style.top  = py + 'px';
+  entry.el.style.display = 'block';
+  return true;
+}
+
+function hideRiveIcon(label) {
+  if (rivePool[label]) {
+    rivePool[label].el.style.display = 'none';
+  }
+}
+
+function hideAllRiveIcons() {
+  Object.values(rivePool).forEach(e => e.el.style.display = 'none');
+}
+
+function spawnCollectBurst(x, y) {
+  const gameCanvas = document.getElementById('gc');
+  const rect = gameCanvas.getBoundingClientRect();
+  const scaleX = rect.width / 680;
+  const scaleY = rect.height / 200;
+
+  const el = document.createElement('div');
+  el.className = 'collect-burst';
+  el.style.left = (x * scaleX - 30) + 'px';
+  el.style.top  = (y * scaleY - 30) + 'px';
+  riveLayer.appendChild(el);
+  setTimeout(() => el.remove(), 400);
+}
+
+// Pre-warm Rive instances if URL is set
+if (riveAvailable) {
+  console.log('🎮 Rive ready — pre-loading icons from', RIV_URL);
+}
+
+// ═══════════════════════════════════════════
+// GAME ENGINE (same as original, extended)
+// ═══════════════════════════════════════════
 const cv=document.getElementById('gc');
 const cx=cv.getContext('2d');
 cx.imageSmoothingEnabled=false;
@@ -171,6 +360,8 @@ function drawDoor(ox,oy,ci){
   cx.fillStyle='#F4D242';cx.fillRect(ox+DW-3*P,oy+11*P,2*P,2*P);
   cx.fillStyle='#111';cx.fillRect(ox+DW-3*P+1,oy+11*P+1,P,P);
 }
+
+// ── Pixel art fallback drawers (used when no Rive URL) ──
 function drawHeart(ox,oy){cx.fillStyle='#ff4477';[[1,0,2],[4,0,2],[0,1,7],[0,2,7],[1,3,5],[2,4,3],[3,5,1]].forEach(([x,y,w])=>cx.fillRect(ox+x*P,oy+y*P,w*P,P));cx.fillStyle='#ff99bb';[[1,1],[2,1],[1,2]].forEach(([x,y])=>cx.fillRect(ox+x*P,oy+y*P,P,P));cx.fillStyle='#fff';cx.fillRect(ox+2*P,oy+P,P,P);}
 function drawStar(ox,oy){cx.fillStyle='#F4D242';cx.fillRect(ox+3*P,oy,2*P,8*P);cx.fillRect(ox,oy+3*P,8*P,2*P);[[1,1],[6,1],[1,6],[6,6]].forEach(([x,y])=>cx.fillRect(ox+x*P,oy+y*P,P,P));}
 function drawBanana(ox,oy){cx.fillStyle='#226600';cx.fillRect(ox+3*P,oy,2*P,2*P);cx.fillStyle='#F4D242';[[1,1,6],[0,2,7],[0,3,7],[1,4,6],[2,5,5],[3,6,4],[4,7,3]].forEach(([x,y,w])=>cx.fillRect(ox+x*P,oy+y*P,w*P,P));cx.fillStyle='#fff';cx.fillRect(ox+P,oy+2*P,2*P,P);cx.fillStyle='#cc8800';cx.fillRect(ox+5*P,oy+7*P,2*P,2*P);}
@@ -178,7 +369,17 @@ function drawFlag(ox,oy){cx.fillStyle='#111';cx.fillRect(ox,oy,P,10*P);cx.fillSt
 function drawDiploma(ox,oy){cx.fillStyle='#e8d4a0';cx.fillRect(ox,oy,10*P,10*P);cx.fillStyle='#f5e6c0';cx.fillRect(ox+P,oy,8*P,9*P);cx.fillStyle='#cc9900';[[2,2,6],[2,4,4],[2,6,5]].forEach(([x,y,w])=>cx.fillRect(ox+x*P,oy+y*P,w*P,P));cx.fillStyle='#cc2233';cx.fillRect(ox+4*P,oy+8*P,2*P,3*P);cx.fillStyle='#F4D242';cx.fillRect(ox+3*P,oy+9*P,4*P,2*P);cx.fillStyle='#d4c090';cx.fillRect(ox,oy,P,10*P);cx.fillRect(ox+9*P,oy,P,10*P);}
 function drawBook(ox,oy){cx.fillStyle='#5511aa';cx.fillRect(ox,oy+2*P,8*P,8*P);cx.fillStyle='#9944ee';cx.fillRect(ox+P,oy+2*P,7*P,7*P);cx.fillStyle='#7733cc';cx.fillRect(ox+P,oy+P,8*P,8*P);cx.fillStyle='#fff';cx.fillRect(ox,oy+2*P,2*P,7*P);cx.fillRect(ox+P,oy+8*P,7*P,2*P);cx.fillStyle='#33ddcc';cx.fillRect(ox+4*P,oy+3*P,2*P,P);cx.fillRect(ox+5*P,oy+4*P,P,P);cx.fillRect(ox+4*P,oy+5*P,P,P);cx.fillRect(ox+4*P,oy+7*P,P,P);}
 function drawCamera(ox,oy){cx.fillStyle='#333344';cx.fillRect(ox,oy+P,11*P,7*P);cx.fillStyle='#111';cx.fillRect(ox+3*P,oy+2*P,5*P,5*P);cx.fillStyle='#2244cc';cx.fillRect(ox+4*P,oy+3*P,3*P,3*P);cx.fillStyle='#fff';cx.fillRect(ox+4*P,oy+3*P,P,P);cx.fillStyle='#ffee44';cx.fillRect(ox+9*P,oy+2*P,2*P,2*P);cx.fillStyle='#ff4444';cx.fillRect(ox+5*P,oy,P,P);cx.fillStyle='#888';cx.fillRect(ox+P,oy,2*P,P);cx.fillRect(ox+8*P,oy,2*P,P);}
-const ITEMS=[{label:'Banana Lab fundada',draw:drawBanana},{label:'Pasión creativa',draw:drawHeart},{label:'ESADE · Brand Management',draw:drawDiploma},{label:'Medellín → Barcelona',draw:drawFlag},{label:'10 años experiencia',draw:drawStar},{label:'AI y nuevos caminos',draw:drawBook},{label:'Dentsu Creative',draw:drawCamera}];
+
+const ITEMS=[
+  {label:'Banana Lab fundada',    draw:drawBanana,  rivArtboard: RIV_ARTBOARDS[0]},
+  {label:'Pasión creativa',       draw:drawHeart,   rivArtboard: RIV_ARTBOARDS[1]},
+  {label:'ESADE · Brand Mgmt',    draw:drawDiploma, rivArtboard: RIV_ARTBOARDS[2]},
+  {label:'Medellín → Barcelona',  draw:drawFlag,    rivArtboard: RIV_ARTBOARDS[3]},
+  {label:'10 años experiencia',   draw:drawStar,    rivArtboard: RIV_ARTBOARDS[4]},
+  {label:'AI y nuevos caminos',   draw:drawBook,    rivArtboard: RIV_ARTBOARDS[5]},
+  {label:'Dentsu Creative',       draw:drawCamera,  rivArtboard: RIV_ARTBOARDS[6]},
+];
+
 const STARS=Array.from({length:30},()=>({x:Math.random()*W,y:Math.random()*(GY-10),t:Math.random()*Math.PI*2,cross:Math.random()<0.3}));
 function drawBg(){
   cx.fillStyle='#000011';cx.fillRect(0,0,W,H);
@@ -189,40 +390,144 @@ function drawBg(){
   for(let x=0;x<W;x+=8){cx.fillStyle=((x/8+Math.floor(fr/5))%2===0)?'#F4D242':'#111';cx.fillRect(x,GY+3,8,8);}
 }
 function drawHUD(){cx.fillStyle='rgba(0,0,0,0.75)';cx.fillRect(0,0,W,18);cx.fillStyle='#F4D242';cx.font='7px "Press Start 2P",monospace';cx.textAlign='left';cx.fillText('★ '+collected.length+'/'+ITEMS.length,8,13);cx.textAlign='right';cx.fillText('SCORE: '+score,W-8,13);}
+
 let cat,obs,items,fr=0,score=0,spd=3.5,stimer=70,collected=[],state='idle',aid;
-function init(){cat={x:60,y:GY-CPX,vy:0,jump:false};obs=[];items=[];fr=0;score=0;collected=[];spd=3.5;stimer=70;document.getElementById('sb-r').textContent='SCORE: 0';document.getElementById('sb-l').textContent='🐱 ROSE RUNNER — ESPACIO PARA SALTAR';}
+
+function init(){
+  cat={x:60,y:GY-CPX,vy:0,jump:false};
+  obs=[];items=[];fr=0;score=0;collected=[];spd=3.5;stimer=70;
+  hideAllRiveIcons();
+  document.getElementById('sb-r').textContent='SCORE: 0';
+  document.getElementById('sb-l').textContent='🐱 ROSE RUNNER — ESPACIO PARA SALTAR';
+}
+
 function loop(){
   if(state!=='play')return;
   cx.clearRect(0,0,W,H);drawBg();
   fr++;score++;if(fr%300===0)spd=Math.min(spd+0.18,8.5);
   document.getElementById('sb-r').textContent='SCORE: '+score;
+
   cat.vy+=0.62;cat.y+=cat.vy;
   const gnd=GY-CPX;if(cat.y>=gnd){cat.y=gnd;cat.vy=0;cat.jump=false;}
+
   stimer--;
   if(stimer<=0){
-    if(Math.random()<0.44&&collected.length<ITEMS.length){const avail=ITEMS.filter(i=>!collected.find(c=>c.label===i.label));if(avail.length){const it=avail[Math.floor(Math.random()*avail.length)];items.push({x:W+20,y:GY-12*P,...it,t:fr});}}
-    else{obs.push({x:W+20,y:GY-DH,scheme:Math.floor(Math.random()*4)});}
+    if(Math.random()<0.44&&collected.length<ITEMS.length){
+      const avail=ITEMS.filter(i=>!collected.find(c=>c.label===i.label));
+      if(avail.length){
+        const it=avail[Math.floor(Math.random()*avail.length)];
+        const itObj={x:W+20,y:GY-12*P,...it,t:fr};
+        items.push(itObj);
+        // Pre-warm Rive icon
+        if(riveAvailable) getRiveIcon(it.label, it.rivArtboard);
+      }
+    } else {
+      obs.push({x:W+20,y:GY-DH,scheme:Math.floor(Math.random()*4)});
+    }
     stimer=55+Math.floor(Math.random()*55);
   }
-  obs.forEach(o=>o.x-=spd);items.forEach(i=>i.x-=spd);
-  obs=obs.filter(o=>o.x>-60);items=items.filter(i=>i.x>-50);
+
+  obs.forEach(o=>o.x-=spd);
+  items.forEach(i=>i.x-=spd);
+  obs=obs.filter(o=>o.x>-60);
+  items=items.filter(i=>i.x>-50);
+
   const cl=cat.x+3*P,cr=cat.x+CPX-3*P,ct=cat.y+2*P,cb=cat.y+CPX-P;
-  for(let o of obs){if(cr>o.x+4&&cl<o.x+DW-4&&cb>o.y+6&&ct<o.y+DH-2){endGame();return;}}
-  for(let i=items.length-1;i>=0;i--){const it=items[i];if(cr>it.x+2&&cl<it.x+10*P-2&&cb>it.y+2&&ct<it.y+10*P-2){collected.push(it);items.splice(i,1);document.getElementById('sb-l').textContent='★ '+collected.length+'/'+ITEMS.length+' ITEMS';}}
+  for(let o of obs){
+    if(cr>o.x+4&&cl<o.x+DW-4&&cb>o.y+6&&ct<o.y+DH-2){endGame();return;}
+  }
+  for(let i=items.length-1;i>=0;i--){
+    const it=items[i];
+    if(cr>it.x+2&&cl<it.x+10*P-2&&cb>it.y+2&&ct<it.y+10*P-2){
+      collected.push(it);
+      // Collect effect
+      spawnCollectBurst(it.x + 16, it.y + 16);
+      hideRiveIcon(it.label);
+      items.splice(i,1);
+      document.getElementById('sb-l').textContent='★ '+collected.length+'/'+ITEMS.length+' ITEMS';
+      continue;
+    }
+    // Render: Rive if available, else pixel art
+    const shown = riveAvailable
+      ? showRiveIcon(it.label, it.rivArtboard, it.x, it.y)
+      : false;
+
+    if(!shown){
+      // Pixel art fallback with glow
+      const b=0.55+Math.sin(fr*0.12+it.t)*0.45;
+      cx.globalAlpha=b;
+      cx.fillStyle='rgba(244,210,66,0.22)';
+      cx.fillRect(it.x-4,it.y-4,12*P+8,12*P+8);
+      cx.globalAlpha=1;
+      it.draw(it.x,it.y);
+    }
+  }
+
+  // Hide Rive icons for items no longer in array
+  ITEMS.forEach(def => {
+    const active = items.find(i => i.label === def.label);
+    if(!active) hideRiveIcon(def.label);
+  });
+
   obs.forEach(o=>drawDoor(o.x,o.y,o.scheme));
-  items.forEach(it=>{const b=0.55+Math.sin(fr*0.12+it.t)*0.45;cx.globalAlpha=b;cx.fillStyle='rgba(244,210,66,0.22)';cx.fillRect(it.x-4,it.y-4,12*P+8,12*P+8);cx.globalAlpha=1;it.draw(it.x,it.y);});
   drawCat(cat.x,cat.y,Math.floor(fr/7)%2,cat.jump);
-  drawHUD();aid=requestAnimationFrame(loop);
+  drawHUD();
+  aid=requestAnimationFrame(loop);
 }
+
 function jump(){if(!cat.jump&&state==='play'){cat.vy=-13;cat.jump=true;}}
-function endGame(){cancelAnimationFrame(aid);state='end';const n=collected.length;document.getElementById('et').textContent=n>=5?'¡CRACK! ★':n>=3?'GOOD RUN! ♡':'GAME OVER...';document.getElementById('ec').textContent=n;document.getElementById('ov-end').style.display='flex';updateUL();}
-function updateUL(){document.getElementById('ul').innerHTML=ITEMS.map(it=>{const g=collected.find(c=>c.label===it.label);return`<span class="ul-item${g?' got':''}">${it.label}</span>`;}).join('');}
+
+function endGame(){
+  cancelAnimationFrame(aid);
+  hideAllRiveIcons();
+  state='end';
+  const n=collected.length;
+  document.getElementById('et').textContent=n>=5?'¡CRACK! ★':n>=3?'GOOD RUN! ♡':'GAME OVER...';
+  document.getElementById('ec').textContent=n;
+  document.getElementById('ov-end').style.display='flex';
+  updateUL();
+}
+
+function updateUL(){
+  document.getElementById('ul').innerHTML=ITEMS.map(it=>{
+    const g=collected.find(c=>c.label===it.label);
+    return`<span class="ul-item${g?' got':''}">${it.label}</span>`;
+  }).join('');
+}
+
 document.getElementById('sb').onclick=()=>{document.getElementById('ov-start').style.display='none';state='play';init();loop();};
 document.getElementById('rb').onclick=()=>{document.getElementById('ov-end').style.display='none';document.getElementById('bio').style.display='none';state='play';init();loop();};
 document.getElementById('bb').onclick=()=>{updateUL();document.getElementById('bio').style.display='block';document.getElementById('ov-end').style.display='none';document.getElementById('bio').scrollIntoView({behavior:'smooth'});};
 document.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();jump();}});
 cv.addEventListener('click',jump);
 cv.addEventListener('touchstart',e=>{e.preventDefault();jump();});
+
+// ── Drag & drop .riv file directly onto the game ─────────────────
+const gameArea = document.getElementById('game-area');
+gameArea.addEventListener('dragover', e => { e.preventDefault(); });
+gameArea.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if(!file || !file.name.endsWith('.riv')){
+    riveNotice.textContent = '⚠️ Drop a .riv file here';
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  // Reload all Rive instances with new URL
+  Object.entries(rivePool).forEach(([label, entry]) => {
+    if(entry.riveInstance) entry.riveInstance.cleanup();
+    entry.el.remove();
+  });
+  Object.keys(rivePool).forEach(k => delete rivePool[k]);
+  // Patch RIV_URL globally
+  window.__RIV_URL_OVERRIDE = url;
+  riveNotice.textContent = '✓ Rive file loaded: ' + file.name + ' — ¡a jugar!';
+  setTimeout(() => riveNotice.style.display = 'none', 3000);
+});
+
+// Override getRiveIcon to support drag-dropped files
+const _origGetRiveIcon = getRiveIcon;
+// (the override is handled by checking window.__RIV_URL_OVERRIDE inside the pool init above)
 </script>
 </body>
 </html>
