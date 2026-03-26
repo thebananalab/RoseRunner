@@ -62,6 +62,10 @@ canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-
   from{filter:drop-shadow(0 0 4px #F4D24266);}
   to{filter:drop-shadow(0 0 12px #F4D242cc) drop-shadow(0 0 20px #f060c844);}
 }
+@keyframes skull-pulse{
+  from{filter:drop-shadow(0 0 4px #ff000066);transform:scale(0.95);}
+  to{filter:drop-shadow(0 0 14px #ff0000cc) drop-shadow(0 0 24px #ff444466);transform:scale(1.05);}
+}
 
 /* collect burst */
 .collect-burst{
@@ -142,6 +146,25 @@ canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-
       <p>Soy directora creativa y consultora de marca con más de diez años de experiencia. Mi carrera se ha movido siempre en la intersección entre creatividad y estrategia: identidades de marca, sistemas de contenido, equipos creativos y estrategias digitales.</p>
       <p>Este último año fundé <strong>Banana Lab</strong>, un estudio de herramientas con IA para equipos creativos. Construirlo me hizo ver que necesito pensar en producto y tomar decisiones con mayor rigor metodológico. Por eso me apunté al máster.</p>
       <p>Mi objetivo: consolidar Banana Lab y llegar a roles como Creative AI Lead o Head of Brand & Product. Este máster conecta lo que he hecho con lo que quiero construir. ♡</p>
+
+      <p class="bio-lbl" style="margin-top:20px;margin-bottom:8px">FORMACIÓN</p>
+      <div class="unlocks">
+        <span class="ul-item got">ESADE</span>
+        <span class="ul-item got">NUCLIO</span>
+        <span class="ul-item got">UAB</span>
+        <span class="ul-item got">UPB</span>
+      </div>
+
+      <p class="bio-lbl" style="margin-top:20px;margin-bottom:8px">EXPERIENCIA</p>
+      <div class="unlocks">
+        <span class="ul-item got">DOIY</span>
+        <span class="ul-item got">EMS</span>
+        <span class="ul-item got">EDUCAHUB</span>
+        <span class="ul-item got">TIMELING</span>
+        <span class="ul-item got">MOCA</span>
+        <span class="ul-item got">LD</span>
+      </div>
+
       <p class="bio-lbl" style="margin-top:20px;margin-bottom:8px">ITEMS DESBLOQUEADOS</p>
       <div class="unlocks" id="ul"></div>
     </div>
@@ -158,17 +181,19 @@ canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-
         (open your file in https://rive.app/preview to see artboard names)
      ══════════════════════════════════════════════ -->
 <script>
-// ── CONFIG: update these two lines ───────────────────────────────
+// ── CONFIG ────────────────────────────────────────────────────────
 const RIV_URL = 'https://thebananalab.github.io/RoseRunner/25691-49048-interactive-icon-set.riv';
-const RIV_ARTBOARDS = [      // artboard name per item (7 total), or '' to use default
-  '',  // Banana Lab
-  '',  // Pasión creativa
-  '',  // ESADE diploma
-  '',  // Medellín → Barcelona
-  '',  // 10 años experiencia
-  '',  // AI y nuevos caminos
-  '',  // Dentsu Creative
+const RIV_CAT_ARTBOARD = '12_Cat'; // protagonista Rose
+const RIV_ARTBOARDS = [
+  '19_Comet',    // Medellín → Barcelona
+  '02_Heart',    // Pasión creativa
+  '06_Diamon',   // ESADE · Formación
+  '01_Star',     // 10 años experiencia
+  '37_Bomb',     // AI y nuevos caminos
+  '23_Coin',     // Experiencia profesional
+  '26_Fire',     // Banana Lab fundada
 ];
+const RIV_SKULL_ARTBOARD = '15_Skull'; // obstáculo
 // ─────────────────────────────────────────────────────────────────
 </script>
 
@@ -349,16 +374,70 @@ function drawCat(ox,oy,frame,jumping){
   const grid=jumping?JUMP_F:FRAMES[frame%2];
   for(let r=0;r<SPR;r++){const row=grid[r];if(!row)continue;for(let c=0;c<SPR;c++){const v=row[c];if(!v)continue;cx.fillStyle=PAL[v];cx.fillRect(ox+c*P,oy+r*P,P,P);}}
 }
-const DCOLS=[{f:'#d63060',p:'#aa2050',t:'#800030'},{f:'#2255cc',p:'#1144aa',t:'#003388'},{f:'#cc6622',p:'#aa5511',t:'#883300'},{f:'#338844',p:'#226633',t:'#114422'}];
-const DW=11*P,DH=20*P;
-function drawDoor(ox,oy,ci){
-  const s=DCOLS[ci%4];
-  cx.fillStyle=s.t;cx.fillRect(ox,oy,DW,DH);
-  cx.fillStyle=s.f;cx.fillRect(ox+P,oy+P,DW-2*P,DH-P);
-  cx.fillStyle=s.p;cx.fillRect(ox+2*P,oy+2*P,DW-4*P,7*P);cx.fillRect(ox+2*P,oy+11*P,DW-4*P,7*P);
-  cx.fillStyle='rgba(255,255,255,0.18)';cx.fillRect(ox+2*P,oy+2*P,2*P,2*P);cx.fillRect(ox+2*P,oy+11*P,2*P,2*P);
-  cx.fillStyle='#F4D242';cx.fillRect(ox+DW-3*P,oy+11*P,2*P,2*P);
-  cx.fillStyle='#111';cx.fillRect(ox+DW-3*P+1,oy+11*P+1,P,P);
+// Skull obstacle — rendered as Rive icon on the overlay layer
+// Size matches a 48x48 Rive canvas scaled to the game canvas
+const SK=48; // skull pixel size in overlay coords (before CSS scaling)
+const DW=SK,DH=SK; // hitbox dimensions (used for collision, same as icon)
+
+// pool for skull Rive instances (one per obstacle slot — reuse by id)
+const skullPool={};
+let skullIdCounter=0;
+
+function getSkullRive(id){
+  if(!riveAvailable) return null;
+  if(skullPool[id]) return skullPool[id];
+  const wrapper=document.createElement('div');
+  wrapper.className='rive-icon';
+  wrapper.style.cssText='position:absolute;width:48px;height:48px;pointer-events:none;display:none;filter:drop-shadow(0 0 8px #ff000099);animation:skull-pulse 0.6s ease-in-out infinite alternate;';
+  const cvs=document.createElement('canvas');
+  cvs.width=48;cvs.height=48;
+  wrapper.appendChild(cvs);
+  riveLayer.appendChild(wrapper);
+  let ri=null;
+  try{
+    ri=new Rive({src:RIV_URL,canvas:cvs,artboard:RIV_SKULL_ARTBOARD,autoplay:true,
+      onLoad:()=>ri.resizeDrawingSurfaceToCanvas(),
+      onLoadError:(e)=>{wrapper.style.display='none';}});
+  }catch(e){}
+  skullPool[id]={el:wrapper,riveInstance:ri};
+  return skullPool[id];
+}
+
+function showSkull(id,x,y){
+  if(!riveAvailable) return false;
+  const entry=getSkullRive(id);
+  if(!entry) return false;
+  const gameCanvas=document.getElementById('gc');
+  const rect=gameCanvas.getBoundingClientRect();
+  const scaleX=rect.width/680;
+  const scaleY=rect.height/200;
+  entry.el.style.left=(x*scaleX)+'px';
+  entry.el.style.top=(y*scaleY)+'px';
+  entry.el.style.display='block';
+  return true;
+}
+
+function hideSkull(id){
+  if(skullPool[id]) skullPool[id].el.style.display='none';
+}
+
+function hideAllSkulls(){
+  Object.values(skullPool).forEach(e=>e.el.style.display='none');
+}
+
+// Pixel-art fallback skull
+function drawSkullFallback(ox,oy){
+  cx.fillStyle='#eee';
+  cx.fillRect(ox+2*P,oy,8*P,6*P);
+  cx.fillRect(ox+P,oy+2*P,10*P,5*P);
+  cx.fillRect(ox+3*P,oy+6*P,6*P,4*P);
+  cx.fillRect(ox+2*P,oy+7*P,8*P,2*P);
+  cx.fillStyle='#111';
+  cx.fillRect(ox+2*P,oy+2*P,3*P,3*P);
+  cx.fillRect(ox+7*P,oy+2*P,3*P,3*P);
+  cx.fillRect(ox+4*P,oy+8*P,P,2*P);
+  cx.fillRect(ox+6*P,oy+8*P,P,2*P);
+  cx.fillRect(ox+5*P,oy+7*P,2*P,P);
 }
 
 // ── Pixel art fallback drawers (used when no Rive URL) ──
@@ -371,13 +450,13 @@ function drawBook(ox,oy){cx.fillStyle='#5511aa';cx.fillRect(ox,oy+2*P,8*P,8*P);c
 function drawCamera(ox,oy){cx.fillStyle='#333344';cx.fillRect(ox,oy+P,11*P,7*P);cx.fillStyle='#111';cx.fillRect(ox+3*P,oy+2*P,5*P,5*P);cx.fillStyle='#2244cc';cx.fillRect(ox+4*P,oy+3*P,3*P,3*P);cx.fillStyle='#fff';cx.fillRect(ox+4*P,oy+3*P,P,P);cx.fillStyle='#ffee44';cx.fillRect(ox+9*P,oy+2*P,2*P,2*P);cx.fillStyle='#ff4444';cx.fillRect(ox+5*P,oy,P,P);cx.fillStyle='#888';cx.fillRect(ox+P,oy,2*P,P);cx.fillRect(ox+8*P,oy,2*P,P);}
 
 const ITEMS=[
-  {label:'Banana Lab fundada',    draw:drawBanana,  rivArtboard: RIV_ARTBOARDS[0]},
+  {label:'Medellín → Barcelona',  draw:drawFlag,    rivArtboard: RIV_ARTBOARDS[0]},
   {label:'Pasión creativa',       draw:drawHeart,   rivArtboard: RIV_ARTBOARDS[1]},
-  {label:'ESADE · Brand Mgmt',    draw:drawDiploma, rivArtboard: RIV_ARTBOARDS[2]},
-  {label:'Medellín → Barcelona',  draw:drawFlag,    rivArtboard: RIV_ARTBOARDS[3]},
-  {label:'10 años experiencia',   draw:drawStar,    rivArtboard: RIV_ARTBOARDS[4]},
-  {label:'AI y nuevos caminos',   draw:drawBook,    rivArtboard: RIV_ARTBOARDS[5]},
-  {label:'Dentsu Creative',       draw:drawCamera,  rivArtboard: RIV_ARTBOARDS[6]},
+  {label:'ESADE · Nuclio · UAB · UPB', draw:drawDiploma, rivArtboard: RIV_ARTBOARDS[2]},
+  {label:'10 años experiencia',   draw:drawStar,    rivArtboard: RIV_ARTBOARDS[3]},
+  {label:'AI y nuevos caminos',   draw:drawBook,    rivArtboard: RIV_ARTBOARDS[4]},
+  {label:'DOIY · EMS · EDUCAHUB · TIMELING · MOCA · LD', draw:drawCamera, rivArtboard: RIV_ARTBOARDS[5]},
+  {label:'Banana Lab fundada',    draw:drawBanana,  rivArtboard: RIV_ARTBOARDS[6]},
 ];
 
 const STARS=Array.from({length:30},()=>({x:Math.random()*W,y:Math.random()*(GY-10),t:Math.random()*Math.PI*2,cross:Math.random()<0.3}));
@@ -397,6 +476,7 @@ function init(){
   cat={x:60,y:GY-CPX,vy:0,jump:false};
   obs=[];items=[];fr=0;score=0;collected=[];spd=3.5;stimer=70;
   hideAllRiveIcons();
+  hideAllSkulls();
   document.getElementById('sb-r').textContent='SCORE: 0';
   document.getElementById('sb-l').textContent='🐱 ROSE RUNNER — ESPACIO PARA SALTAR';
 }
@@ -422,7 +502,7 @@ function loop(){
         if(riveAvailable) getRiveIcon(it.label, it.rivArtboard);
       }
     } else {
-      obs.push({x:W+20,y:GY-DH,scheme:Math.floor(Math.random()*4)});
+      obs.push({x:W+20,y:GY-DH,id:'sk'+(skullIdCounter++)});
     }
     stimer=55+Math.floor(Math.random()*55);
   }
@@ -469,7 +549,14 @@ function loop(){
     if(!active) hideRiveIcon(def.label);
   });
 
-  obs.forEach(o=>drawDoor(o.x,o.y,o.scheme));
+  // Render skulls (Rive or fallback)
+  obs.forEach(o=>{
+    const shown=riveAvailable?showSkull(o.id,o.x,o.y):false;
+    if(!shown) drawSkullFallback(o.x,o.y);
+  });
+  // Hide skulls that scrolled off
+  const activeSkullIds=new Set(obs.map(o=>o.id));
+  Object.keys(skullPool).forEach(id=>{if(!activeSkullIds.has(id))hideSkull(id);});
   drawCat(cat.x,cat.y,Math.floor(fr/7)%2,cat.jump);
   drawHUD();
   aid=requestAnimationFrame(loop);
@@ -480,6 +567,7 @@ function jump(){if(!cat.jump&&state==='play'){cat.vy=-13;cat.jump=true;}}
 function endGame(){
   cancelAnimationFrame(aid);
   hideAllRiveIcons();
+  hideAllSkulls();
   state='end';
   const n=collected.length;
   document.getElementById('et').textContent=n>=5?'¡CRACK! ★':n>=3?'GOOD RUN! ♡':'GAME OVER...';
