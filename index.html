@@ -102,7 +102,7 @@ canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-
 
     <!-- Rive icons rendered here, on top of the canvas -->
     <div id="rive-layer"></div>
-    <div id="rive-notice">🎮 Rive icons: drop your .riv file or set RIV_URL below</div>
+    <div id="rive-notice" style="display:none"></div>
 
     <div class="ov" id="ov-start">
       <div class="panel">
@@ -159,7 +159,7 @@ canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-
      ══════════════════════════════════════════════ -->
 <script>
 // ── CONFIG: update these two lines ───────────────────────────────
-const RIV_URL = '';          // e.g. 'https://yoursite.com/icons.riv'
+const RIV_URL = 'https://thebananalab.github.io/RoseRunner/25691-49048-interactive-icon-set.riv';
 const RIV_ARTBOARDS = [      // artboard name per item (7 total), or '' to use default
   '',  // Banana Lab
   '',  // Pasión creativa
